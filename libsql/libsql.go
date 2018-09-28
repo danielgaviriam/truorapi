@@ -2,17 +2,17 @@ package libsql
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
+	_ "github.com/lib/pq" //use
 	model "github.com/neox-hk/truorapi/models"
 )
 
-//Connectdb export
+//Connectdb export with GORM
 func Connectdb() *gorm.DB {
-	db, err := gorm.Open("postgres", "host=baasu.db.elephantsql.com port=5432 user=hjamibre dbname=hjamibre password=DKGbN1fndOho8LYzWhtjtVjxetRgxxnH")
+	db, err := gorm.Open("postgres", "host=baasu.db.elephantsql.com port=5432 user=zgxxbdhj dbname=zgxxbdhj password=whbzu3uTA38i6VjFoUS7w6S8xzdbv1Wh")
 
 	if err != nil {
 		panic("failed to connect database")
@@ -27,31 +27,51 @@ func Connectdb() *gorm.DB {
 func GetReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
-	var receta model.Receta
-	_ = json.NewDecoder(r.Body).Decode(&receta)
+	params := mux.Vars(r)
 
 	db := Connectdb()
-	result := db.NewRecord(receta)
-	db.Create(&receta)
-	defer db.Close()
 
-	if result {
-		json.NewEncoder(w).Encode(1)
-	} else {
-		json.NewEncoder(w).Encode(0)
-	}
+	var receta model.Receta
+
+	db.First(&receta, params["id"])
+
+	json.NewEncoder(w).Encode(receta)
+	defer db.Close()
+	return
 }
 
-//GetCrearReceta export
-func GetCrearReceta(w http.ResponseWriter, r *http.Request) {
+//CrearReceta export
+func CrearReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	test := json.NewDecoder(r.Body)
-	fmt.Println(test)
+	db := Connectdb()
+
+	var newReceta model.Receta
+	_ = json.NewDecoder(r.Body).Decode(&newReceta)
+
+	exists := db.Where("Nombre = ?", newReceta.Nombre).First(&newReceta).RecordNotFound()
+
+	if exists {
+		result := db.NewRecord(newReceta)
+		db.Create(&newReceta)
+
+		if result {
+			json.NewEncoder(w).Encode(1)
+		} else {
+			json.NewEncoder(w).Encode(0)
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(3)
+		defer db.Close()
+	}
+	return
+
 }
 
-//--End Crud de Unidades
+//--End Crud de Recetas
 
 //--Crud de Unidades
 

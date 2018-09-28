@@ -22,20 +22,15 @@ func main() {
 
 	//Connect to database
 	db := libsql.Connectdb()
-	/*
-		db.AutoMigrate(&Unidade{})
-		db.AutoMigrate(&Ingrediente{})
-		db.AutoMigrate(&Tipo{})
-		db.AutoMigrate(&Receta{})
-		db.AutoMigrate(&recetaIngrediente{})
-	*/
+
+	//db.AutoMigrate(models.Unidade{}, models.Tipo{}, models.Receta{}, models.Ingrediente{}, models.RecetaIngrediente{})
 
 	log.Println("Server started on: http://localhost:8080")
 
 	//Enlaces:
 	r.HandleFunc("/", index)
 	//Recetas
-	r.HandleFunc("/recetas/", libsql.GetReceta).Methods("POST")
+	r.HandleFunc("/recetas/", libsql.CrearReceta).Methods("POST")
 	r.HandleFunc("/recetas/{id}", libsql.GetReceta).Methods("GET")
 	//Unidades
 	r.HandleFunc("/unidades/{id}", libsql.GetUnidad).Methods("GET")

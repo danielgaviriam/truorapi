@@ -2,30 +2,6 @@ package models
 
 import "github.com/jinzhu/gorm"
 
-//Ingrediente is a struct
-type Ingrediente struct {
-	gorm.Model
-	Nombre      string
-	Descripcion string
-	Unidade     Unidade `gorm:"foreignkey:Unidad"`
-}
-
-//Receta is a struct
-type Receta struct {
-	gorm.Model
-	Nombre string
-	Public bool
-	Tipos  []Tipo `gorm:"many2many:recetaTipos;"` //Relacion NtoN simple
-}
-
-//recetaIngrediente is a struct
-type recetaIngrediente struct {
-	gorm.Model
-	Receta      Receta      `gorm:"foreignkey:Receta"`
-	Ingrediente Ingrediente `gorm:"foreignkey:Ingrediente"`
-	Cantidad    float32
-}
-
 //Tipo is a struct
 type Tipo struct {
 	gorm.Model
@@ -38,4 +14,33 @@ type Unidade struct {
 	gorm.Model
 	Nombre string
 	Abrev  string
+}
+
+//Ingrediente is a struct
+type Ingrediente struct {
+	gorm.Model
+	Nombre            string
+	Descripcion       string
+	Unidade           Unidade `gorm:"foreignkey:UnidadeID"`
+	UnidadeID         int
+	RecetaIngrediente []*RecetaIngrediente
+}
+
+//Receta is a struct
+type Receta struct {
+	gorm.Model
+	Nombre            string
+	Public            bool
+	Tipos             []Tipo `gorm:"many2many:recetaTipos;"` //Relacion NtoN simple
+	RecetaIngrediente []*RecetaIngrediente
+}
+
+//RecetaIngrediente is a struct
+type RecetaIngrediente struct {
+	gorm.Model
+	Receta        *Receta
+	RecetaID      int
+	Ingrediente   *Ingrediente
+	IngredienteID int
+	Cantidad      float32
 }
