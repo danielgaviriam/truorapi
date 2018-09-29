@@ -2,6 +2,7 @@ package libsql
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -23,6 +24,21 @@ func Connectdb() *gorm.DB {
 }
 
 //--Crud de Recetas
+
+//GetRecetas export
+func GetRecetas(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	recetas := []model.Receta{}
+	db.Preload("Tipos").Preload("RecetaIngrediente").Find(&recetas)
+
+	json.NewEncoder(w).Encode(recetas)
+	defer db.Close()
+	return
+}
 
 //GetReceta export
 func GetReceta(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +91,48 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 	}
 	return
 
+}
+
+//UpdaterReceta export
+func UpdaterReceta(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	//registro Antiguo
+	var receta model.Receta
+	//Registro Nuevo
+	var updatedReceta model.Receta
+	_ = json.NewDecoder(r.Body).Decode(&updatedReceta)
+
+	_ = db.First(&receta, params["id"])
+
+	//Actualizando Ingrediente
+	db.Model(&receta).Updates(&updatedReceta)
+
+	defer db.Close()
+}
+
+//DeleteReceta export
+func DeleteReceta(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var receta model.Receta
+	_ = db.Find(&receta, params["id"])
+
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.RecetaIngrediente{})
+
+	receta.Tipos = []model.Tipo{}
+	_ = db.Save(&receta)
+
+	db.Debug().Delete(&receta)
+
+	defer db.Close()
 }
 
 //--End Crud de Recetas
@@ -179,6 +237,8 @@ func GetUnidad(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	db := Connectdb()
+
+	fmt.Println("test")
 
 	var unidad model.Unidade
 	_ = db.First(&unidad, params["id"])
