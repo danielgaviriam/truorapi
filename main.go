@@ -7,7 +7,6 @@ import (
 	libsql "github.com/neox-hk/truorapi/libsql"
 
 	"github.com/gorilla/mux"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
 
 //Render Home Page Api-REST
@@ -42,6 +41,11 @@ func main() {
 	r.HandleFunc("/tipos/", libsql.CrearTipo).Methods("POST")
 	r.HandleFunc("/tipos/{id}", libsql.UpdateTipo).Methods("PUT")
 	r.HandleFunc("/tipos/{id}", libsql.DeleteTipo).Methods("DELETE")
+	//Ingredientes
+	r.HandleFunc("/ingredientes/", libsql.CrearIngrediente).Methods("POST")
+	r.HandleFunc("/ingredientes/{id}", libsql.GetIngrediente).Methods("GET")
+	r.HandleFunc("/ingredientes/{id}", libsql.UpdateIngrediente).Methods("PUT")
+	r.HandleFunc("/ingredientes/{id}", libsql.DeleteIngrediente).Methods("DELETE")
 
 	http.ListenAndServe(":8080", r)
 

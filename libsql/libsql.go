@@ -12,7 +12,8 @@ import (
 
 //Connectdb export with GORM
 func Connectdb() *gorm.DB {
-	db, err := gorm.Open("postgres", "host=baasu.db.elephantsql.com port=5432 user=zgxxbdhj dbname=zgxxbdhj password=whbzu3uTA38i6VjFoUS7w6S8xzdbv1Wh")
+
+	db, err := gorm.Open("postgres", "host=baasu.db.elephantsql.com port=5432 user=zgxxbdhj dbname=zgxxbdhj password=P8GwHaKaKoHp4IYLvYMveuoAe0BIR0xn")
 
 	if err != nil {
 		panic("failed to connect database")
@@ -34,6 +35,11 @@ func GetReceta(w http.ResponseWriter, r *http.Request) {
 	var receta model.Receta
 
 	db.First(&receta, params["id"])
+
+	//Load many2many Information
+	db.Preload("Tipos").Find(&receta, receta.ID)
+	db.Preload("RecetaIngrediente").Find(&receta, receta.ID)
+	db.Preload("Ingrediente").Find(&receta.RecetaIngrediente)
 
 	json.NewEncoder(w).Encode(receta)
 	defer db.Close()
@@ -72,6 +78,97 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 }
 
 //--End Crud de Recetas
+
+//--Crud de Ingredientes
+
+//GetIngrediente export
+func GetIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var ingrediente model.Ingrediente
+	var unidad model.Unidade
+	_ = db.First(&ingrediente, params["id"])
+	_ = db.First(&unidad, ingrediente.UnidadeID)
+	ingrediente.Unidade = unidad
+
+	json.NewEncoder(w).Encode(ingrediente)
+	defer db.Close()
+	return
+
+}
+
+//CrearIngrediente export
+func CrearIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	var newIngrediente model.Ingrediente
+	_ = json.NewDecoder(r.Body).Decode(&newIngrediente)
+
+	exists := db.Where("Nombre = ?", newIngrediente.Nombre).First(&newIngrediente).RecordNotFound()
+
+	if exists {
+		result := db.NewRecord(newIngrediente)
+		db.Create(&newIngrediente)
+
+		if result {
+			json.NewEncoder(w).Encode(1)
+		} else {
+			json.NewEncoder(w).Encode(0)
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(3)
+		defer db.Close()
+	}
+	return
+}
+
+//UpdateIngrediente export
+func UpdateIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	//registro Antiguo
+	var ingrediente model.Ingrediente
+	//Registro Nuevo
+	var updatedIngrediente model.Ingrediente
+	_ = json.NewDecoder(r.Body).Decode(&updatedIngrediente)
+
+	_ = db.Find(&ingrediente, params["id"])
+
+	//Actualizando Ingrediente
+	db.Model(&ingrediente).Updates(model.Ingrediente{Nombre: updatedIngrediente.Nombre, Descripcion: updatedIngrediente.Descripcion, UnidadeID: updatedIngrediente.UnidadeID})
+
+	defer db.Close()
+}
+
+//DeleteIngrediente export
+func DeleteIngrediente(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var ingrediente model.Ingrediente
+	_ = db.Find(&ingrediente, params["id"])
+
+	db.Debug().Delete(&ingrediente)
+
+	defer db.Close()
+}
+
+//--End Crud de Ingredientes
 
 //--Crud de Unidades
 
@@ -170,8 +267,7 @@ func GetTipo(w http.ResponseWriter, r *http.Request) {
 	db := Connectdb()
 
 	var tipo model.Tipo
-
-	_ = db.Find(&tipo, params["id"])
+	_ = db.First(&tipo, params["id"])
 
 	json.NewEncoder(w).Encode(tipo)
 	defer db.Close()
@@ -217,7 +313,7 @@ func UpdateTipo(w http.ResponseWriter, r *http.Request) {
 
 	db := Connectdb()
 
-	var tipo model.Unidade
+	var tipo model.Tipo
 	var updatedTipo model.Tipo
 	_ = json.NewDecoder(r.Body).Decode(&updatedTipo)
 
