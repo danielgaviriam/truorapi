@@ -30,7 +30,7 @@ type Ingrediente struct {
 type Receta struct {
 	gorm.Model
 	Nombre            string
-	Public            bool
+	Descripcion       string
 	Tipos             []Tipo `gorm:"many2many:recetaTipos;"` //Relacion NtoN simple
 	RecetaIngrediente []*RecetaIngrediente
 }

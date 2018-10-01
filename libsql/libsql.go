@@ -49,9 +49,7 @@ func GetReceta(w http.ResponseWriter, r *http.Request) {
 	db := Connectdb()
 
 	var receta model.Receta
-
 	db.First(&receta, params["id"])
-
 	//Load many2many Information
 	db.Preload("Tipos").Find(&receta, receta.ID)
 	db.Preload("RecetaIngrediente").Find(&receta, receta.ID)
@@ -69,8 +67,31 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 
 	db := Connectdb()
 
+	//Ajustando Tipos Completos
 	var newReceta model.Receta
 	_ = json.NewDecoder(r.Body).Decode(&newReceta)
+
+	fmt.Println(newReceta.RecetaIngrediente[0].Cantidad)
+
+	tipos := newReceta.Tipos
+	tiposCompletos := []model.Tipo{}
+
+	for i := 0; i < len(tipos); i++ {
+		var tip model.Tipo
+		_ = db.First(&tip, tipos[i].ID)
+		tiposCompletos = append(tiposCompletos, tip)
+	}
+	newReceta.Tipos = tiposCompletos
+
+	//Ajustando Ingredientes Completos
+
+	for i := 0; i < len(newReceta.RecetaIngrediente); i++ {
+		var ing *model.Ingrediente
+		_ = db.First(&ing, newReceta.RecetaIngrediente[i].Ingrediente.ID)
+
+		newReceta.RecetaIngrediente[i].Ingrediente = ing
+
+	}
 
 	exists := db.Where("Nombre = ?", newReceta.Nombre).First(&newReceta).RecordNotFound()
 
@@ -86,7 +107,8 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 		defer db.Close()
 
 	} else {
-		json.NewEncoder(w).Encode(3)
+		resp := []byte(`{"resp":"3"}`)
+		json.NewEncoder(w).Encode(resp)
 		defer db.Close()
 	}
 	return
@@ -138,6 +160,21 @@ func DeleteReceta(w http.ResponseWriter, r *http.Request) {
 //--End Crud de Recetas
 
 //--Crud de Ingredientes
+
+//GetIngredientes export
+func GetIngredientes(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	ingredientes := []model.Ingrediente{}
+	db.Find(&ingredientes)
+
+	json.NewEncoder(w).Encode(ingredientes)
+	defer db.Close()
+	return
+}
 
 //GetIngrediente export
 func GetIngrediente(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +267,21 @@ func DeleteIngrediente(w http.ResponseWriter, r *http.Request) {
 
 //--Crud de Unidades
 
+//GetUnides export
+func GetUnidades(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	unidades := []model.Unidade{}
+	db.Find(&unidades)
+
+	json.NewEncoder(w).Encode(unidades)
+	defer db.Close()
+	return
+}
+
 //GetUnidad export
 func GetUnidad(w http.ResponseWriter, r *http.Request) {
 
@@ -237,9 +289,7 @@ func GetUnidad(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	db := Connectdb()
-
-	fmt.Println("test")
-
+	fmt.Println("hello")
 	var unidad model.Unidade
 	_ = db.First(&unidad, params["id"])
 
@@ -318,6 +368,21 @@ func DeleteUnidad(w http.ResponseWriter, r *http.Request) {
 
 //--Crud de Tipos
 
+//GetTipos export
+func GetTipos(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	tipos := []model.Tipo{}
+	db.Find(&tipos)
+
+	json.NewEncoder(w).Encode(tipos)
+	defer db.Close()
+	return
+}
+
 //GetTipo export
 func GetTipo(w http.ResponseWriter, r *http.Request) {
 
@@ -391,7 +456,7 @@ func DeleteTipo(w http.ResponseWriter, r *http.Request) {
 
 	db := Connectdb()
 
-	var tipo model.Unidade
+	var tipo model.Tipo
 	_ = db.Find(&tipo, params["id"])
 
 	db.Delete(&tipo)

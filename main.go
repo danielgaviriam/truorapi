@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	libsql "github.com/neox-hk/truorapi/libsql"
+	//models "github.com/neox-hk/truorapi/models"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -17,13 +18,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	//Handlers
-	allowedHeaders := handlers.AllowedHeaders([]string{"X-Requested-With"})
-	allowedOrigins := handlers.AllowedOrigins([]string{"*"})
-	allowedMethods := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"})
-
 	//Iniciarndo Router
 	r := mux.NewRouter()
+
+	//Handlers
+	allowedHeaders := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	allowedOrigins := handlers.AllowedOrigins([]string{"*"})
+	allowedMethods := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"})
 
 	//Connect to database
 	db := libsql.Connectdb()
@@ -43,18 +44,21 @@ func main() {
 	r.HandleFunc("/recetas/{id}", libsql.DeleteReceta).Methods("DELETE")
 
 	//Unidades
+	r.HandleFunc("/unidades/", libsql.GetUnidades).Methods("GET")
 	r.HandleFunc("/unidades/{id}", libsql.GetUnidad).Methods("GET")
 	r.HandleFunc("/unidades/", libsql.CrearUnidad).Methods("POST")
 	r.HandleFunc("/unidades/{id}", libsql.UpdateUnidad).Methods("PUT")
 	r.HandleFunc("/unidades/{id}", libsql.DeleteUnidad).Methods("DELETE")
 
 	//Tipo
+	r.HandleFunc("/tipos/", libsql.GetTipos).Methods("GET")
 	r.HandleFunc("/tipos/{id}", libsql.GetTipo).Methods("GET")
 	r.HandleFunc("/tipos/", libsql.CrearTipo).Methods("POST")
 	r.HandleFunc("/tipos/{id}", libsql.UpdateTipo).Methods("PUT")
 	r.HandleFunc("/tipos/{id}", libsql.DeleteTipo).Methods("DELETE")
 
 	//Ingredientes
+	r.HandleFunc("/ingredientes/", libsql.GetIngredientes).Methods("GET")
 	r.HandleFunc("/ingredientes/", libsql.CrearIngrediente).Methods("POST")
 	r.HandleFunc("/ingredientes/{id}", libsql.GetIngrediente).Methods("GET")
 	r.HandleFunc("/ingredientes/{id}", libsql.UpdateIngrediente).Methods("PUT")
