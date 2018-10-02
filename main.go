@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	libsql "github.com/neox-hk/truorapi/libsql"
-	//models "github.com/neox-hk/truorapi/models"
+	models "github.com/neox-hk/truorapi/models"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -22,7 +22,7 @@ func main() {
 	r := mux.NewRouter()
 
 	//Handlers
-	allowedHeaders := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	allowedHeaders := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization", "Content-Length", "Accept-Encoding", "X-CSRF-Token"})
 	allowedOrigins := handlers.AllowedOrigins([]string{"*"})
 	allowedMethods := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"})
 
@@ -40,7 +40,7 @@ func main() {
 	r.HandleFunc("/recetas/", libsql.GetRecetas).Methods("GET")
 	r.HandleFunc("/recetas/", libsql.CrearReceta).Methods("POST")
 	r.HandleFunc("/recetas/{id}", libsql.GetReceta).Methods("GET")
-	r.HandleFunc("/recetas/{id}", libsql.UpdaterReceta).Methods("PUT")
+	r.HandleFunc("/recetas/{id}", libsql.UpdateReceta).Methods("PUT")
 	r.HandleFunc("/recetas/{id}", libsql.DeleteReceta).Methods("DELETE")
 
 	//Unidades

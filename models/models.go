@@ -44,3 +44,8 @@ type RecetaIngrediente struct {
 	IngredienteID int
 	Cantidad      float32
 }
+
+//ToResponse is a struct
+type ToResponse struct {
+	Num int
+}

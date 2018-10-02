@@ -2,7 +2,6 @@ package libsql
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -71,8 +70,6 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 	var newReceta model.Receta
 	_ = json.NewDecoder(r.Body).Decode(&newReceta)
 
-	fmt.Println(newReceta.RecetaIngrediente[0].Cantidad)
-
 	tipos := newReceta.Tipos
 	tiposCompletos := []model.Tipo{}
 
@@ -90,6 +87,7 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 		_ = db.First(&ing, newReceta.RecetaIngrediente[i].Ingrediente.ID)
 
 		newReceta.RecetaIngrediente[i].Ingrediente = ing
+		newReceta.RecetaIngrediente[i].IngredienteID = newReceta.RecetaIngrediente[i].IngredienteID
 
 	}
 
@@ -100,23 +98,23 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 		db.Create(&newReceta)
 
 		if result {
-			json.NewEncoder(w).Encode(1)
+
+			json.NewEncoder(w).Encode(model.ToResponse{1})
 		} else {
-			json.NewEncoder(w).Encode(0)
+			json.NewEncoder(w).Encode(model.ToResponse{0})
 		}
 		defer db.Close()
 
 	} else {
-		resp := []byte(`{"resp":"3"}`)
-		json.NewEncoder(w).Encode(resp)
+		json.NewEncoder(w).Encode(model.ToResponse{3})
 		defer db.Close()
 	}
 	return
 
 }
 
-//UpdaterReceta export
-func UpdaterReceta(w http.ResponseWriter, r *http.Request) {
+//UpdateReceta export
+func UpdateReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -131,8 +129,38 @@ func UpdaterReceta(w http.ResponseWriter, r *http.Request) {
 
 	_ = db.First(&receta, params["id"])
 
-	//Actualizando Ingrediente
-	db.Model(&receta).Updates(&updatedReceta)
+	//Eliminando recetaAnterior
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.RecetaIngrediente{})
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.Tipo{})
+	db.Delete(&receta)
+
+	//Ajustando Tipos Completos
+
+	tipos := updatedReceta.Tipos
+	tiposCompletos := []model.Tipo{}
+
+	for i := 0; i < len(tipos); i++ {
+		var tip model.Tipo
+		_ = db.First(&tip, tipos[i].ID)
+		tiposCompletos = append(tiposCompletos, tip)
+	}
+	updatedReceta.Tipos = tiposCompletos
+
+	//Ajustando Ingredientes Completos
+
+	for i := 0; i < len(updatedReceta.RecetaIngrediente); i++ {
+		var ing *model.Ingrediente
+		_ = db.First(&ing, updatedReceta.RecetaIngrediente[i].Ingrediente.ID)
+
+		updatedReceta.RecetaIngrediente[i].Ingrediente = ing
+		updatedReceta.RecetaIngrediente[i].IngredienteID = updatedReceta.RecetaIngrediente[i].IngredienteID
+
+	}
+
+	//Actualizando Receta
+	//db.Model(&receta).Updates(&updatedReceta)
+	_ = db.NewRecord(updatedReceta)
+	db.Create(&updatedReceta)
 
 	defer db.Close()
 }
@@ -152,7 +180,9 @@ func DeleteReceta(w http.ResponseWriter, r *http.Request) {
 	receta.Tipos = []model.Tipo{}
 	_ = db.Save(&receta)
 
-	db.Debug().Delete(&receta)
+	db.Delete(&receta)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
 
 	defer db.Close()
 }
@@ -170,6 +200,7 @@ func GetIngredientes(w http.ResponseWriter, r *http.Request) {
 
 	ingredientes := []model.Ingrediente{}
 	db.Find(&ingredientes)
+	db.Preload("Unidade").Find(&ingredientes)
 
 	json.NewEncoder(w).Encode(ingredientes)
 	defer db.Close()
@@ -208,19 +239,24 @@ func CrearIngrediente(w http.ResponseWriter, r *http.Request) {
 
 	exists := db.Where("Nombre = ?", newIngrediente.Nombre).First(&newIngrediente).RecordNotFound()
 
+	var uni model.Unidade
+	_ = db.First(&uni, newIngrediente.UnidadeID)
+
+	newIngrediente.Unidade = uni
+
 	if exists {
 		result := db.NewRecord(newIngrediente)
 		db.Create(&newIngrediente)
 
 		if result {
-			json.NewEncoder(w).Encode(1)
+			json.NewEncoder(w).Encode(model.ToResponse{1})
 		} else {
-			json.NewEncoder(w).Encode(0)
+			json.NewEncoder(w).Encode(model.ToResponse{0})
 		}
 		defer db.Close()
 
 	} else {
-		json.NewEncoder(w).Encode(3)
+		json.NewEncoder(w).Encode(model.ToResponse{3})
 		defer db.Close()
 	}
 	return
@@ -245,6 +281,8 @@ func UpdateIngrediente(w http.ResponseWriter, r *http.Request) {
 	//Actualizando Ingrediente
 	db.Model(&ingrediente).Updates(model.Ingrediente{Nombre: updatedIngrediente.Nombre, Descripcion: updatedIngrediente.Descripcion, UnidadeID: updatedIngrediente.UnidadeID})
 
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
 	defer db.Close()
 }
 
@@ -259,6 +297,8 @@ func DeleteIngrediente(w http.ResponseWriter, r *http.Request) {
 	_ = db.Find(&ingrediente, params["id"])
 
 	db.Debug().Delete(&ingrediente)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
 
 	defer db.Close()
 }
@@ -289,7 +329,6 @@ func GetUnidad(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	db := Connectdb()
-	fmt.Println("hello")
 	var unidad model.Unidade
 	_ = db.First(&unidad, params["id"])
 
@@ -316,14 +355,14 @@ func CrearUnidad(w http.ResponseWriter, r *http.Request) {
 		db.Create(&newUnidad)
 
 		if result {
-			json.NewEncoder(w).Encode(1)
+			json.NewEncoder(w).Encode(model.ToResponse{1})
 		} else {
-			json.NewEncoder(w).Encode(0)
+			json.NewEncoder(w).Encode(model.ToResponse{0})
 		}
 		defer db.Close()
 
 	} else {
-		json.NewEncoder(w).Encode(3)
+		json.NewEncoder(w).Encode(model.ToResponse{3})
 		defer db.Close()
 	}
 	return
@@ -346,6 +385,8 @@ func UpdateUnidad(w http.ResponseWriter, r *http.Request) {
 
 	db.Model(&unidad).Updates(model.Unidade{Nombre: updatedUnidad.Nombre, Abrev: updatedUnidad.Abrev})
 
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
 	defer db.Close()
 }
 
@@ -360,6 +401,8 @@ func DeleteUnidad(w http.ResponseWriter, r *http.Request) {
 	_ = db.Find(&unidad, params["id"])
 
 	db.Delete(&unidad)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
 
 	defer db.Close()
 }
@@ -417,14 +460,14 @@ func CrearTipo(w http.ResponseWriter, r *http.Request) {
 		db.Create(&newTipo)
 
 		if result {
-			json.NewEncoder(w).Encode(1)
+			json.NewEncoder(w).Encode(model.ToResponse{1})
 		} else {
-			json.NewEncoder(w).Encode(0)
+			json.NewEncoder(w).Encode(model.ToResponse{0})
 		}
 		defer db.Close()
 
 	} else {
-		json.NewEncoder(w).Encode(3)
+		json.NewEncoder(w).Encode(model.ToResponse{3})
 		defer db.Close()
 	}
 	return
@@ -446,6 +489,8 @@ func UpdateTipo(w http.ResponseWriter, r *http.Request) {
 
 	db.Model(&tipo).Updates(model.Tipo{Nombre: updatedTipo.Nombre, Descripcion: updatedTipo.Descripcion})
 
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
 	defer db.Close()
 }
 
@@ -460,6 +505,8 @@ func DeleteTipo(w http.ResponseWriter, r *http.Request) {
 	_ = db.Find(&tipo, params["id"])
 
 	db.Delete(&tipo)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
 
 	defer db.Close()
 }
