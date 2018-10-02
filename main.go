@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	libsql "github.com/neox-hk/truorapi/libsql"
-	models "github.com/neox-hk/truorapi/models"
+	//models "github.com/neox-hk/truorapi/models"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -56,6 +56,7 @@ func main() {
 	r.HandleFunc("/tipos/", libsql.CrearTipo).Methods("POST")
 	r.HandleFunc("/tipos/{id}", libsql.UpdateTipo).Methods("PUT")
 	r.HandleFunc("/tipos/{id}", libsql.DeleteTipo).Methods("DELETE")
+	r.HandleFunc("/tipos-agrupados/{id}", libsql.AgruparTipos).Methods("GET")
 
 	//Ingredientes
 	r.HandleFunc("/ingredientes/", libsql.GetIngredientes).Methods("GET")

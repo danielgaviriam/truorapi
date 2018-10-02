@@ -2,12 +2,12 @@ package libsql
 
 import (
 	"encoding/json"
-	"net/http"
-
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq" //use
 	model "github.com/neox-hk/truorapi/models"
+	"net/http"
 )
 
 //Connectdb export with GORM
@@ -24,7 +24,7 @@ func Connectdb() *gorm.DB {
 
 //--Crud de Recetas
 
-//GetRecetas export
+//GetRecetas export todas las recetas almacenadas
 func GetRecetas(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -39,7 +39,7 @@ func GetRecetas(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-//GetReceta export
+//GetReceta export la receta almacenada segun id (parametro GET)
 func GetReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -52,14 +52,14 @@ func GetReceta(w http.ResponseWriter, r *http.Request) {
 	//Load many2many Information
 	db.Preload("Tipos").Find(&receta, receta.ID)
 	db.Preload("RecetaIngrediente").Find(&receta, receta.ID)
-	db.Preload("Ingrediente").Find(&receta.RecetaIngrediente)
+	db.Preload("Ingrediente").Find(&receta.RecetaIngrediente, receta.RecetaIngrediente[0].ID)
 
 	json.NewEncoder(w).Encode(receta)
 	defer db.Close()
 	return
 }
 
-//CrearReceta export
+//CrearReceta export crea una receta nueva
 func CrearReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -83,6 +83,11 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 	//Ajustando Ingredientes Completos
 
 	for i := 0; i < len(newReceta.RecetaIngrediente); i++ {
+
+		if newReceta.RecetaIngrediente[i].Ingrediente.ID == 0 {
+			fmt.Println("entre")
+		}
+
 		var ing *model.Ingrediente
 		_ = db.First(&ing, newReceta.RecetaIngrediente[i].Ingrediente.ID)
 
@@ -113,7 +118,7 @@ func CrearReceta(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//UpdateReceta export
+//UpdateReceta export Actualiza una receta existente
 func UpdateReceta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -165,7 +170,7 @@ func UpdateReceta(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 }
 
-//DeleteReceta export
+//DeleteReceta export Elimina una receta
 func DeleteReceta(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -227,7 +232,7 @@ func GetIngrediente(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//CrearIngrediente export
+//CrearIngrediente export crea un nuevo ingrediente
 func CrearIngrediente(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -262,7 +267,7 @@ func CrearIngrediente(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-//UpdateIngrediente export
+//UpdateIngrediente export Actualiza un ingrediente existente
 func UpdateIngrediente(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -286,7 +291,7 @@ func UpdateIngrediente(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 }
 
-//DeleteIngrediente export
+//DeleteIngrediente export Elimina un ingrediente
 func DeleteIngrediente(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -338,7 +343,7 @@ func GetUnidad(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//CrearUnidad export
+//CrearUnidad export crea una unidad nueva
 func CrearUnidad(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -369,7 +374,7 @@ func CrearUnidad(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//UpdateUnidad export
+//UpdateUnidad export Actualiza una unidad existente
 func UpdateUnidad(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -390,7 +395,7 @@ func UpdateUnidad(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 }
 
-//DeleteUnidad export
+//DeleteUnidad exportc Elimina una unidad
 func DeleteUnidad(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -443,7 +448,7 @@ func GetTipo(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//CrearTipo export
+//CrearTipo export crea un tipo nuevo
 func CrearTipo(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -473,7 +478,7 @@ func CrearTipo(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-//UpdateTipo export
+//UpdateTipo export Actualiza un tipo existente
 func UpdateTipo(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -494,7 +499,7 @@ func UpdateTipo(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 }
 
-//DeleteTipo export
+//DeleteTipo export Elimina un tipo
 func DeleteTipo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -507,6 +512,26 @@ func DeleteTipo(w http.ResponseWriter, r *http.Request) {
 	db.Delete(&tipo)
 
 	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//AgruparTipos export Agrupa las recetas por tipo (id)
+func AgruparTipos(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	recetas := []model.Receta{}
+
+	row := db.Joins("left join receta_tipos on receta.id = receta_tipos.receta_id").Where("receta_tipos.tipo_id = ?", params["id"]).Find(&recetas)
+
+	fmt.Println(row)
+	//db.Debug().Model(&tipo).Related(&recetas)
+
+	//json.NewEncoder(w).Encode(model.ToResponse{1})
 
 	defer db.Close()
 }
