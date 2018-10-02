@@ -1,15 +1,540 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-    <title>Rest-api Libro de Recetas</title>
-</head>
-<body>
-    <h3>Se esta ejecutando el API-REST para el Libro de Recetas, Bienvenido</h3>
-    <h3>Esta aplicación response a peticiones HTTPS</h3>
-</body>
-</html>
+package libsql
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
+	_ "github.com/lib/pq" //use
+	model "github.com/neox-hk/truorapi/models"
+	"net/http"
+)
+
+//Connectdb export with GORM
+func Connectdb() *gorm.DB {
+
+	db, err := gorm.Open("postgres", "host=baasu.db.elephantsql.com port=5432 user=zgxxbdhj dbname=zgxxbdhj password=P8GwHaKaKoHp4IYLvYMveuoAe0BIR0xn")
+
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	return db
+}
+
+//--Crud de Recetas
+
+//GetRecetas export todas las recetas almacenadas
+func GetRecetas(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	recetas := []model.Receta{}
+	db.Preload("Tipos").Preload("RecetaIngrediente").Find(&recetas)
+
+	json.NewEncoder(w).Encode(recetas)
+	defer db.Close()
+	return
+}
+
+//GetReceta export la receta almacenada segun id (parametro GET)
+func GetReceta(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var receta model.Receta
+	db.First(&receta, params["id"])
+	//Load many2many Information
+	db.Preload("Tipos").Find(&receta, receta.ID)
+	db.Preload("RecetaIngrediente").Find(&receta, receta.ID)
+
+	for i := 0; i < len(receta.RecetaIngrediente); i++ {
+		db.Preload("Ingrediente").Find(&receta.RecetaIngrediente[i], receta.RecetaIngrediente[i].ID)
+		db.Preload("Unidade").Find(&receta.RecetaIngrediente[i].Ingrediente, receta.RecetaIngrediente[i].Ingrediente.ID)
+	}
+
+	json.NewEncoder(w).Encode(receta)
+	defer db.Close()
+	return
+}
+
+//CrearReceta export crea una receta nueva
+func CrearReceta(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	//Ajustando Tipos Completos
+	var newReceta model.Receta
+	_ = json.NewDecoder(r.Body).Decode(&newReceta)
+
+	tipos := newReceta.Tipos
+	tiposCompletos := []model.Tipo{}
+
+	for i := 0; i < len(tipos); i++ {
+		var tip model.Tipo
+		_ = db.First(&tip, tipos[i].ID)
+		tiposCompletos = append(tiposCompletos, tip)
+	}
+	newReceta.Tipos = tiposCompletos
+
+	//Ajustando Ingredientes Completos
+
+	for i := 0; i < len(newReceta.RecetaIngrediente); i++ {
+
+		if newReceta.RecetaIngrediente[i].Ingrediente.ID == 0 {
+			fmt.Println("entre")
+		}
+
+		var ing *model.Ingrediente
+		_ = db.First(&ing, newReceta.RecetaIngrediente[i].Ingrediente.ID)
+
+		newReceta.RecetaIngrediente[i].Ingrediente = ing
+		newReceta.RecetaIngrediente[i].IngredienteID = newReceta.RecetaIngrediente[i].IngredienteID
+
+	}
+
+	exists := db.Where("Nombre = ?", newReceta.Nombre).First(&newReceta).RecordNotFound()
+
+	if exists {
+		result := db.NewRecord(newReceta)
+		db.Create(&newReceta)
+
+		if result {
+
+			json.NewEncoder(w).Encode(model.ToResponse{1})
+		} else {
+			json.NewEncoder(w).Encode(model.ToResponse{0})
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(model.ToResponse{3})
+		defer db.Close()
+	}
+	return
+
+}
+
+//UpdateReceta export Actualiza una receta existente
+func UpdateReceta(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	//registro Antiguo
+	var receta model.Receta
+	//Registro Nuevo
+	var updatedReceta model.Receta
+	_ = json.NewDecoder(r.Body).Decode(&updatedReceta)
+
+	_ = db.First(&receta, params["id"])
+
+	//Eliminando recetaAnterior
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.RecetaIngrediente{})
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.Tipo{})
+	db.Delete(&receta)
+
+	//Ajustando Tipos Completos
+
+	tipos := updatedReceta.Tipos
+	tiposCompletos := []model.Tipo{}
+
+	for i := 0; i < len(tipos); i++ {
+		var tip model.Tipo
+		_ = db.First(&tip, tipos[i].ID)
+		tiposCompletos = append(tiposCompletos, tip)
+	}
+	updatedReceta.Tipos = tiposCompletos
+
+	//Ajustando Ingredientes Completos
+
+	for i := 0; i < len(updatedReceta.RecetaIngrediente); i++ {
+		var ing *model.Ingrediente
+		_ = db.First(&ing, updatedReceta.RecetaIngrediente[i].Ingrediente.ID)
+
+		updatedReceta.RecetaIngrediente[i].Ingrediente = ing
+		updatedReceta.RecetaIngrediente[i].IngredienteID = updatedReceta.RecetaIngrediente[i].IngredienteID
+
+	}
+
+	//Actualizando Receta
+	//db.Model(&receta).Updates(&updatedReceta)
+	_ = db.NewRecord(updatedReceta)
+	db.Create(&updatedReceta)
+
+	defer db.Close()
+}
+
+//DeleteReceta export Elimina una receta
+func DeleteReceta(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var receta model.Receta
+	_ = db.Find(&receta, params["id"])
+
+	_ = db.Where("receta_id = ?", params["id"]).Delete(model.RecetaIngrediente{})
+
+	receta.Tipos = []model.Tipo{}
+	_ = db.Save(&receta)
+
+	db.Delete(&receta)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//--End Crud de Recetas
+
+//--Crud de Ingredientes
+
+//GetIngredientes export
+func GetIngredientes(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	ingredientes := []model.Ingrediente{}
+	db.Find(&ingredientes)
+	db.Preload("Unidade").Find(&ingredientes)
+
+	json.NewEncoder(w).Encode(ingredientes)
+	defer db.Close()
+	return
+}
+
+//GetIngrediente export
+func GetIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var ingrediente model.Ingrediente
+	var unidad model.Unidade
+	_ = db.First(&ingrediente, params["id"])
+	_ = db.First(&unidad, ingrediente.UnidadeID)
+	ingrediente.Unidade = unidad
+
+	json.NewEncoder(w).Encode(ingrediente)
+	defer db.Close()
+	return
+
+}
+
+//CrearIngrediente export crea un nuevo ingrediente
+func CrearIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	var newIngrediente model.Ingrediente
+	_ = json.NewDecoder(r.Body).Decode(&newIngrediente)
+
+	exists := db.Where("Nombre = ?", newIngrediente.Nombre).First(&newIngrediente).RecordNotFound()
+
+	var uni model.Unidade
+	_ = db.First(&uni, newIngrediente.UnidadeID)
+
+	newIngrediente.Unidade = uni
+
+	if exists {
+		result := db.NewRecord(newIngrediente)
+		db.Create(&newIngrediente)
+
+		if result {
+			json.NewEncoder(w).Encode(model.ToResponse{1})
+		} else {
+			json.NewEncoder(w).Encode(model.ToResponse{0})
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(model.ToResponse{3})
+		defer db.Close()
+	}
+	return
+}
+
+//UpdateIngrediente export Actualiza un ingrediente existente
+func UpdateIngrediente(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	//registro Antiguo
+	var ingrediente model.Ingrediente
+	//Registro Nuevo
+	var updatedIngrediente model.Ingrediente
+	_ = json.NewDecoder(r.Body).Decode(&updatedIngrediente)
+
+	_ = db.Find(&ingrediente, params["id"])
+
+	//Actualizando Ingrediente
+	db.Model(&ingrediente).Updates(model.Ingrediente{Nombre: updatedIngrediente.Nombre, Descripcion: updatedIngrediente.Descripcion, UnidadeID: updatedIngrediente.UnidadeID})
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//DeleteIngrediente export Elimina un ingrediente
+func DeleteIngrediente(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var ingrediente model.Ingrediente
+	_ = db.Find(&ingrediente, params["id"])
+
+	db.Debug().Delete(&ingrediente)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//--End Crud de Ingredientes
+
+//--Crud de Unidades
+
+//GetUnides export
+func GetUnidades(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	unidades := []model.Unidade{}
+	db.Find(&unidades)
+
+	json.NewEncoder(w).Encode(unidades)
+	defer db.Close()
+	return
+}
+
+//GetUnidad export
+func GetUnidad(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+	var unidad model.Unidade
+	_ = db.First(&unidad, params["id"])
+
+	json.NewEncoder(w).Encode(unidad)
+	defer db.Close()
+	return
+
+}
+
+//CrearUnidad export crea una unidad nueva
+func CrearUnidad(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	var newUnidad model.Unidade
+	_ = json.NewDecoder(r.Body).Decode(&newUnidad)
+
+	db := Connectdb()
+
+	// Existe en la bd?
+	exists := db.Where("Nombre = ?", newUnidad.Nombre).First(&newUnidad).RecordNotFound()
+
+	if exists {
+		result := db.NewRecord(newUnidad)
+		db.Create(&newUnidad)
+
+		if result {
+			json.NewEncoder(w).Encode(model.ToResponse{1})
+		} else {
+			json.NewEncoder(w).Encode(model.ToResponse{0})
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(model.ToResponse{3})
+		defer db.Close()
+	}
+	return
+
+}
+
+//UpdateUnidad export Actualiza una unidad existente
+func UpdateUnidad(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var unidad model.Unidade
+	var updatedUnidad model.Unidade
+	_ = json.NewDecoder(r.Body).Decode(&updatedUnidad)
+
+	_ = db.Find(&unidad, params["id"])
+
+	db.Model(&unidad).Updates(model.Unidade{Nombre: updatedUnidad.Nombre, Abrev: updatedUnidad.Abrev})
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//DeleteUnidad exportc Elimina una unidad
+func DeleteUnidad(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var unidad model.Unidade
+	_ = db.Find(&unidad, params["id"])
+
+	db.Delete(&unidad)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//--End Crud de Unidades
+
+//--Crud de Tipos
+
+//GetTipos export
+func GetTipos(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	db := Connectdb()
+
+	tipos := []model.Tipo{}
+	db.Find(&tipos)
+
+	json.NewEncoder(w).Encode(tipos)
+	defer db.Close()
+	return
+}
+
+//GetTipo export
+func GetTipo(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var tipo model.Tipo
+	_ = db.First(&tipo, params["id"])
+
+	json.NewEncoder(w).Encode(tipo)
+	defer db.Close()
+	return
+
+}
+
+//CrearTipo export crea un tipo nuevo
+func CrearTipo(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	var newTipo model.Tipo
+	_ = json.NewDecoder(r.Body).Decode(&newTipo)
+
+	db := Connectdb()
+
+	// Existe en la bd?
+	exists := db.Where("Nombre = ?", newTipo.Nombre).First(&newTipo).RecordNotFound()
+
+	if exists {
+		result := db.NewRecord(newTipo)
+		db.Create(&newTipo)
+
+		if result {
+			json.NewEncoder(w).Encode(model.ToResponse{1})
+		} else {
+			json.NewEncoder(w).Encode(model.ToResponse{0})
+		}
+		defer db.Close()
+
+	} else {
+		json.NewEncoder(w).Encode(model.ToResponse{3})
+		defer db.Close()
+	}
+	return
+}
+
+//UpdateTipo export Actualiza un tipo existente
+func UpdateTipo(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var tipo model.Tipo
+	var updatedTipo model.Tipo
+	_ = json.NewDecoder(r.Body).Decode(&updatedTipo)
+
+	_ = db.Find(&tipo, params["id"])
+
+	db.Model(&tipo).Updates(model.Tipo{Nombre: updatedTipo.Nombre, Descripcion: updatedTipo.Descripcion})
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//DeleteTipo export Elimina un tipo
+func DeleteTipo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var tipo model.Tipo
+	_ = db.Find(&tipo, params["id"])
+
+	db.Delete(&tipo)
+
+	json.NewEncoder(w).Encode(model.ToResponse{1})
+
+	defer db.Close()
+}
+
+//AgruparTipos export Agrupa las recetas por tipo (id)
+func AgruparTipos(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+
+	db := Connectdb()
+
+	var recetas []model.Receta
+
+	_ = db.Joins("JOIN receta_tipos on receta_tipos.receta_id = receta.id").Joins("JOIN tipos on receta_tipos.tipo_id = tipos.id").Where("tipos.id=?", params["id"]).Find(&recetas)
+
+	json.NewEncoder(w).Encode(recetas)
+
+	defer db.Close()
+}
+
+//--End Crud de Tipos
